@@ -1,92 +1,99 @@
 import { Database } from "firebase-admin/database";
 import { Options, WithBaseAttributes } from "./types.js";
 
+const twoHours = 60 * 60 * 2;
+
 export default class Frsh<SessionRecord> {
   private firebaseRTDB: Database;
   private opt: Options;
-  public constructor(db: Database, opts?: Options) {
+
+  public constructor(
+    db: Database,
+    opts: Options = {
+      basePath: "/sessions",
+      tablePath: "/session-table",
+      expires: twoHours,
+    }
+  ) {
     this.firebaseRTDB = db;
 
-    if (opts) {
-      this.opt = opts;
-    } else {
-      this.opt = {
-        basePath: "/",
-        tablePath: "/",
-        expires: 60 * 60 * 2,
-      };
-    }
+    this.opt = opts;
   }
 
+  /**
+   *
+   * @param userId user database id
+   * @param record external record attributes
+   * @returns session key
+   */
   public async createSession(
     userId: string,
-    record: SessionRecord
+    record?: SessionRecord
   ): Promise<string | undefined> {
     const sessionRef = this.firebaseRTDB.ref(this.opt.basePath);
     const tableRef = this.firebaseRTDB.ref(`${this.opt.tablePath}/${userId}`);
 
-    const res = await sessionRef.push(this.createSessionRecord(userId, record));
+    const sessionRecord = this.createSessionRecord(userId, record);
+    const res = await sessionRef.push(sessionRecord);
 
     if (!res.key) return undefined;
 
     await tableRef.update({
-      [res.key]: Date.now(),
+      [res.key]: sessionRecord.TTL,
     });
 
-    return this.encrypt(res.key);
+    return res.key;
   }
 
+  /**
+   *
+   * @param sessionId sessionId
+   * @returns session data
+   */
   public async getSession(
-    hash: string
-  ): Promise<WithBaseAttributes<SessionRecord> | null> {
-    const id = this.decrypt(hash);
-    const ref = this.firebaseRTDB.ref(`${this.opt.basePath}/${id}`);
+    sessionId: string
+  ): Promise<WithBaseAttributes<SessionRecord> | undefined> {
+    const ref = this.firebaseRTDB.ref(`${this.opt.basePath}/${sessionId}`);
     const snapshot = await ref.once("value");
     return snapshot.val() as WithBaseAttributes<SessionRecord>;
   }
 
-  public async deleteSession(hash: string) {
-    const id = this.decrypt(hash);
-    const ref = this.firebaseRTDB.ref(`${this.opt.basePath}/${id}`);
-
+  /**
+   *
+   * @param sessionId sessionId
+   */
+  public async removeSession(sessionId: string): Promise<void> {
+    const ref = this.firebaseRTDB.ref(`${this.opt.basePath}/${sessionId}`);
     await ref.remove();
   }
 
-  public async deleteUserSession(userId: string, hash: string) {
-    const id = this.decrypt(hash);
+  /**
+   *
+   * @param userId user database id
+   * @param sessionId sessionId
+   */
+  public async removeUserSession(
+    userId: string,
+    sessionId: string
+  ): Promise<void> {
     const tableRef = this.firebaseRTDB.ref(
-      `${this.opt.tablePath}/${userId}/${id}`
+      `${this.opt.tablePath}/${userId}/${sessionId}`
     );
-    const sessionRef = this.firebaseRTDB.ref(`${this.opt.basePath}/${id}`);
+    const sessionRef = this.firebaseRTDB.ref(
+      `${this.opt.basePath}/${sessionId}`
+    );
 
     await Promise.all([tableRef.remove, sessionRef.remove]);
   }
 
-  // TODO: encrypt session
-  private encrypt(id: string): string {
-    return id;
-  }
+  //TODO: batch instructions
+  public async removeExpiredSessions(batch: number) {}
 
-  // TODO: decrypt session
-  private decrypt(hash: string): string {
-    return hash;
-  }
-
-  private createSessionRecord(userId: string, record: SessionRecord) {
-    let sessionRecord = {};
-    if (record) {
-      sessionRecord = {
-        TTL: Date.now() + this.opt.expires * 1000,
-        userId,
-        ...record,
-      };
-    } else {
-      sessionRecord = {
-        TTL: Date.now() + this.opt.expires * 1000,
-        userId,
-      };
-    }
-
-    return sessionRecord;
+  private createSessionRecord(userId: string, record?: SessionRecord) {
+    return {
+      TTL: Date.now() + this.opt.expires * 1000,
+      userId,
+      ...record,
+    };
   }
 }
