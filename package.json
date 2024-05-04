@@ -2,13 +2,13 @@
   "name": "frsh",
   "version": "0.0.0",
   "description": "A lightweight session management store for Firebase Realtime DB.",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "module": "./dist/index.js",
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "module": "./lib/index.js",
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "lint": "npx eslint ."
   },
   "keywords": [
     "Firebase"
@@ -20,8 +20,13 @@
   },
   "devDependencies": {
     "@types/node": "^20.12.7",
+    "eslint": "^8.56.0",
     "firebase-admin": "^12.0.0",
     "typescript": "^5.4.4",
+    "typescript-eslint": "^7.8.0",
     "vitest": "^1.4.0"
+  },
+  "dependencies": {
+    "cookie": "^0.6.0"
   }
 }
