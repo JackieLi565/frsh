@@ -7,9 +7,11 @@ export interface Options {
   expires: number;
 }
 
-export type WithBaseAttributes<R = {}> = {
+export type BaseAttributes = {
   // reference to firestore
   userId: string;
   // session time to live in milliseconds
-  TTL: string;
-} & R;
+  TTL: number;
+};
+
+export type WithBaseAttributes<R = {}> = BaseAttributes & R;
