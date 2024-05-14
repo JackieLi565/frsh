@@ -1,29 +1,21 @@
 {
-  "name": "frsh",
-  "version": "0.0.0",
-  "description": "A lightweight session management store for Firebase Realtime DB.",
-  "main": "./lib/index.js",
-  "types": "./lib/index.d.ts",
-  "module": "./lib/index.js",
-  "type": "module",
-  "scripts": {
-    "build": "tsc",
-    "lint": "npx eslint ."
-  },
-  "keywords": [
-    "Firebase"
-  ],
-  "author": "Jackie Li",
-  "license": "MIT",
-  "peerDependencies": {
-    "firebase-admin": ">=9.0.0"
-  },
-  "devDependencies": {
-    "@types/node": "^20.12.7",
-    "eslint": "^8.56.0",
-    "firebase-admin": "^12.0.0",
-    "typescript": "^5.4.4",
-    "typescript-eslint": "^7.8.0",
-    "vitest": "^1.4.0"
-  }
+    "name": "frsh-repository",
+    "version": "0.0.0",
+    "description": "Repository for all things frsh related",
+    "type": "module",
+    "directories": {
+        "doc": "docs",
+        "example": "examples"
+    },
+    "scripts": {
+        "format": "npx prettier . --write",
+        "lint": "npx eslint ."
+    },
+    "author": "Jackie Li",
+    "license": "MIT",
+    "devDependencies": {
+        "@eslint/js": "^9.2.0",
+        "prettier": "3.2.5",
+        "typescript-eslint": "^7.9.0"
+    }
 }

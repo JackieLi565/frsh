@@ -1,0 +1,25 @@
+{
+    "name": "admin-adaptor",
+    "version": "0.0.0",
+    "description": "Frsh adaptor for Firebase admin-sdk",
+    "main": "./lib/index.js",
+    "types": "./lib/index.d.ts",
+    "module": "./lib/index.js",
+    "type": "module",
+    "scripts": {
+        "build": "tsc"
+    },
+    "keywords": [
+        "firebase-admin",
+        "Frsh"
+    ],
+    "author": "Jackie Li",
+    "peerDependencies": {
+        "firebase-admin": "^12.0.0"
+    },
+    "devDependencies": {
+        "@types/node": "^20.12.12",
+        "firebase-admin": "^12.1.0",
+        "typescript": "^5.4.5"
+    }
+}

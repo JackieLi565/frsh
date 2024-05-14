@@ -1,0 +1,21 @@
+{
+    "name": "frsh",
+    "version": "0.0.0",
+    "description": "A lightweight session management store for Firebase Realtime DB.",
+    "main": "./lib/index.js",
+    "types": "./lib/index.d.ts",
+    "module": "./lib/index.js",
+    "type": "module",
+    "scripts": {
+        "build": "tsc",
+        "lint": "npx eslint ."
+    },
+    "keywords": [
+        "Firebase"
+    ],
+    "author": "Jackie Li",
+    "license": "MIT",
+    "devDependencies": {
+        "typescript": "^5.4.4"
+    }
+}

@@ -1,0 +1,20 @@
+{
+    "name": "rest-adaptor",
+    "version": "0.0.0",
+    "description": "Frsh adaptor for REST-api",
+    "main": "./lib/index.js",
+    "types": "./lib/index.d.ts",
+    "module": "./lib/index.js",
+    "type": "module",
+    "scripts": {
+        "build": "tsc"
+    },
+    "keywords": [
+        "REST",
+        "Frsh"
+    ],
+    "author": "Jackie Li",
+    "devDependencies": {
+        "typescript": "^5.4.5"
+    }
+}
