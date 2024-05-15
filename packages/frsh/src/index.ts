@@ -1,18 +1,12 @@
+import { Adaptor } from './internal/index.js'
+
 export interface SessionAttributes {}
 
 export interface Session extends SessionAttributes {
+    // database userId
     userId: string
+    // time in milliseconds when the session expires
     TTL: number
-}
-
-export interface Adaptor {
-    getSession(sessionId: string): Promise<Session | null>
-    getUserSessions(userId: string): Promise<Session[]>
-    createSession(session: Session): Promise<string>
-    updateSessionExpiry(sessionId: string, newExpiry: number): Promise<Session>
-    removeSession(sessionId: string): Promise<void>
-    removeExpiredSessions(): Promise<void>
-    removeUserSessions(userId: string): Promise<void>
 }
 
 export interface PathConfig {
@@ -25,6 +19,7 @@ export interface PathConfig {
 }
 
 export interface Options {
+    // time it takes for a session to expire in milliseconds
     expiry: number
 }
 
