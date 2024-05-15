@@ -8,7 +8,7 @@ export interface Session extends SessionAttributes {
 export interface Adaptor {
     getSession(sessionId: string): Promise<Session | null>
     getUserSessions(userId: string): Promise<Session[]>
-    createSession(session: Session): Promise<Session>
+    createSession(session: Session): Promise<string>
     updateSessionExpiry(sessionId: string, newExpiry: number): Promise<Session>
     removeSession(sessionId: string): Promise<void>
     removeExpiredSessions(): Promise<void>
@@ -45,16 +45,16 @@ export class Frsh {
     async createSession(
         userId: string,
         record: SessionAttributes
-    ): Promise<Session> {
+    ): Promise<[string, Session]> {
         const session: Session = {
             userId,
             TTL: Date.now() + this.options.expiry,
             ...record,
         }
 
-        await this.adaptor.createSession(session)
+        const key = await this.adaptor.createSession(session)
 
-        return session
+        return [key, session]
     }
 
     async verifySession(sessionId: string): Promise<Session | null> {
