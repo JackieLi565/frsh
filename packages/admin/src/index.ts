@@ -1,5 +1,10 @@
-import { Adaptor, PathConfig, Session } from '@frsh-auth/frsh'
-import { Database } from 'firebase-admin/database'
+import type { PathConfig, Session } from '@frsh-auth/frsh'
+import type {
+    Adaptor,
+    SessionPath,
+    TablePath,
+} from '@frsh-auth/frsh/lib/internal'
+import type { Database } from 'firebase-admin/database'
 
 export class AdminAdaptor implements Adaptor {
     private config: PathConfig
