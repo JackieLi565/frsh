@@ -17,46 +17,36 @@ export class AdminAdaptor implements Adaptor {
     }
 
     async getSession(sessionId: string): Promise<Session | null> {
-        const ref = this.driver.ref(this.sessionPath(sessionId))
+        const ref = this.sessionPath(sessionId)
         const snapshot = await ref.once('value')
         return snapshot.val()
     }
 
     async getUserSessions(userId: string): Promise<Session[]> {
-        const tableRef = this.driver.ref(this.tablePath(userId))
-        const tableSnapshot = await tableRef.once('value')
-        const userSessionIds = tableSnapshot.toJSON()
-
-        if (!userSessionIds) return []
-
-        const sessionIds: string[] = Object.entries(userSessionIds).map(
-            ([id]) => id
-        )
+        const sessionIds = await this.getUserSessionIds(userId)
 
         const sessionSnapshots = await Promise.all(
-            sessionIds.map((id) =>
-                this.driver.ref(this.sessionPath(id)).once('value')
-            )
+            sessionIds.map((id) => this.sessionPath(id).once('value'))
         )
 
         return sessionSnapshots
+            .filter((snapshot) => snapshot.exists())
             .map((snapshot) => snapshot.val())
-            .filter((nullSessions) => nullSessions)
     }
 
     async createSession(session: Session): Promise<string> {
-        const tableRef = this.driver.ref(this.tablePath())
-        const sessionRef = this.driver.ref(this.sessionPath())
+        const tableRef = this.tablePath()
+        const sessionRef = this.sessionPath()
 
         const ref = await sessionRef.push(session)
 
         if (!ref.key)
             throw new Error(
-                `null session key response for user - ${session.userId}`
+                `Session Create - ${session.userId} session key response is null`
             )
 
         await tableRef.update({
-            [ref.key]: session.TTL,
+            [ref.key]: Date.now(),
         })
 
         return ref.key
@@ -64,13 +54,35 @@ export class AdminAdaptor implements Adaptor {
 
     async updateSessionExpiry(
         sessionId: string,
-        newExpiry: number
+        extension: number
     ): Promise<Session> {
-        throw new Error('Method not implemented.')
+        const ref = this.sessionPath(sessionId, 'TTL')
+
+        const res = await ref.transaction((TTL) => {
+            if (TTL === null)
+                throw new Error(
+                    `Session Update - property TTL does not exist within ${sessionId} session`
+                )
+
+            return TTL + extension
+        })
+
+        if (!res.committed)
+            throw new Error(
+                `Session Update - failed to update ${sessionId} session expiry`
+            )
+
+        return res.snapshot.val()
     }
 
     async removeSession(sessionId: string): Promise<void> {
-        throw new Error('Method not implemented.')
+        const session = await this.getSession(sessionId)
+        if (!session) return
+
+        const sessionRef = this.sessionPath(sessionId)
+        const tableRef = this.tablePath(session.userId, sessionId)
+
+        await Promise.all([sessionRef.remove(), tableRef.remove()])
     }
 
     async removeExpiredSessions(): Promise<void> {
@@ -78,11 +90,29 @@ export class AdminAdaptor implements Adaptor {
     }
 
     async removeUserSessions(userId: string): Promise<void> {
-        throw new Error('Method not implemented.')
+        const sessionIds = await this.getUserSessionIds(userId)
+        const tableRef = this.tablePath(userId)
+
+        const sessionPromise = sessionIds.map((id) =>
+            this.sessionPath(id).remove()
+        )
+
+        await Promise.all([...sessionPromise, tableRef.remove()])
+    }
+
+    private async getUserSessionIds(userId: string) {
+        const tableRef = this.tablePath(userId)
+        const tableSnapshot = await tableRef.once('value')
+
+        if (!tableSnapshot.exists()) return []
+
+        const userSessionIds = tableSnapshot.val()
+
+        return Object.entries(userSessionIds).map(([id]) => id)
     }
 
     private rootPath(...path: string[]) {
-        return this.config.root.concat(path).join('/')
+        return this.driver.ref(this.config.root.concat(path).join('/'))
     }
 
     private sessionPath(...path: string[]) {
