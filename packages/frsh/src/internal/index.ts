@@ -10,6 +10,11 @@ export interface Adaptor {
     removeUserSessions(userId: string): Promise<void>
 }
 
+export interface RootPath {
+    session: SessionPath
+    table: TablePath
+}
+
 export interface SessionPath {
     [sessionId: string]: Session
 }

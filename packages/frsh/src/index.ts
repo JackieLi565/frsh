@@ -12,10 +12,6 @@ export interface Session extends SessionAttributes {
 export interface PathConfig {
     // root storage path
     root: string[]
-    // session path
-    sessions: string[]
-    // table path
-    table: string[]
 }
 
 export interface Options {
