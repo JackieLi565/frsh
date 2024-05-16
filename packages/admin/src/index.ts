@@ -1,20 +1,16 @@
 import type { PathConfig, Session } from '@frsh-auth/frsh'
-import type {
-    Adaptor,
-    SessionPath,
-    TablePath,
-} from '@frsh-auth/frsh/lib/internal'
-import type { Database } from 'firebase-admin/database'
+import type { Adaptor, SessionPath } from '@frsh-auth/frsh/lib/internal'
+import type { Database, Reference } from 'firebase-admin/database'
 
 export class AdminAdaptor implements Adaptor {
     private config: PathConfig
     private driver: Database
+    private SESSION_PATH = 'sessions'
+    private TABLE_PATH = 'table'
 
     constructor(driver: Database, config?: Partial<PathConfig>) {
         const defaultConfig: PathConfig = {
             root: ['frsh'],
-            sessions: ['sessions'],
-            table: ['table'],
         }
 
         this.config = { ...defaultConfig, ...config }
@@ -90,19 +86,36 @@ export class AdminAdaptor implements Adaptor {
         await Promise.all([sessionRef.remove(), tableRef.remove()])
     }
 
-    async removeExpiredSessions(): Promise<void> {
-        throw new Error('Method not implemented.')
-    }
-
     async removeUserSessions(userId: string): Promise<void> {
         const sessionIds = await this.getUserSessionIds(userId)
         const tableRef = this.tablePath(userId)
 
-        const sessionPromise = sessionIds.map((id) =>
-            this.sessionPath(id).remove()
-        )
+        const sessionRefs = sessionIds.map((id) => this.sessionPath(id))
 
-        await Promise.all([...sessionPromise, tableRef.remove()])
+        await Promise.all([
+            ...sessionRefs.map((ref) => ref.remove()),
+            tableRef.remove(),
+        ])
+    }
+
+    async removeExpiredSessions(): Promise<void> {
+        const sessionRef = this.sessionPath()
+        const sessionSnapshot = await sessionRef.once('value')
+
+        const sessions: SessionPath = sessionSnapshot.val()
+
+        const expiredSessions: Reference[] = []
+
+        for (const [id, session] of Object.entries(sessions)) {
+            if (Date.now() <= session.TTL) continue
+
+            expiredSessions.push(
+                this.sessionPath(id),
+                this.tablePath(session.userId, id)
+            )
+        }
+
+        await Promise.all(expiredSessions.map((ref) => ref.remove()))
     }
 
     private async getUserSessionIds(userId: string) {
@@ -121,10 +134,10 @@ export class AdminAdaptor implements Adaptor {
     }
 
     private sessionPath(...path: string[]) {
-        return this.rootPath(...this.config.sessions, ...path)
+        return this.rootPath(this.SESSION_PATH, ...path)
     }
 
     private tablePath(...path: string[]) {
-        return this.rootPath(...this.config.table, ...path)
+        return this.rootPath(this.TABLE_PATH, ...path)
     }
 }

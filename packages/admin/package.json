@@ -16,10 +16,10 @@
     "author": "Jackie Li",
     "peerDependencies": {
         "firebase-admin": "12.x",
-        "@frsh-auth/frsh": "0.0.3"
+        "@frsh-auth/frsh": "0.0.4"
     },
     "devDependencies": {
-        "@frsh-auth/frsh": "^0.0.3",
+        "@frsh-auth/frsh": "^0.0.4",
         "@types/node": "^20.12.12",
         "firebase-admin": "^12.1.0",
         "typescript": "^5.4.5"
