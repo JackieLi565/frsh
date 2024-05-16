@@ -1,6 +1,7 @@
 import type { PathConfig, Session } from '@frsh-auth/frsh'
-import type { Adaptor, SessionPath } from '@frsh-auth/frsh/lib/internal'
-import type { Database, Reference } from 'firebase-admin/database'
+import type { Adaptor, TablePath } from '@frsh-auth/frsh/lib/internal'
+import type { Database } from 'firebase-admin/database'
+import { Removable } from './internal/index.js'
 
 export class AdminAdaptor implements Adaptor {
     private config: PathConfig
@@ -18,7 +19,7 @@ export class AdminAdaptor implements Adaptor {
     }
 
     async getSession(sessionId: string): Promise<Session | null> {
-        const ref = this.sessionPath(sessionId)
+        const ref = this.ref(this.sessionPath(sessionId))
         const snapshot = await ref.once('value')
         return snapshot.val()
     }
@@ -27,7 +28,7 @@ export class AdminAdaptor implements Adaptor {
         const sessionIds = await this.getUserSessionIds(userId)
 
         const sessionSnapshots = await Promise.all(
-            sessionIds.map((id) => this.sessionPath(id).once('value'))
+            sessionIds.map((id) => this.ref(this.sessionPath(id)).once('value'))
         )
 
         return sessionSnapshots
@@ -36,8 +37,8 @@ export class AdminAdaptor implements Adaptor {
     }
 
     async createSession(session: Session): Promise<string> {
-        const tableRef = this.tablePath()
-        const sessionRef = this.sessionPath()
+        const tableRef = this.ref(this.tablePath())
+        const sessionRef = this.ref(this.sessionPath())
 
         const ref = await sessionRef.push(session)
 
@@ -57,7 +58,7 @@ export class AdminAdaptor implements Adaptor {
         sessionId: string,
         extension: number
     ): Promise<Session> {
-        const ref = this.sessionPath(sessionId, 'TTL')
+        const ref = this.ref(this.sessionPath(sessionId, 'TTL'))
 
         const res = await ref.transaction((TTL) => {
             if (TTL === null)
@@ -83,43 +84,75 @@ export class AdminAdaptor implements Adaptor {
         const sessionRef = this.sessionPath(sessionId)
         const tableRef = this.tablePath(session.userId, sessionId)
 
-        await Promise.all([sessionRef.remove(), tableRef.remove()])
+        const updates: Removable = {
+            [sessionRef]: null,
+            [tableRef]: null,
+        }
+
+        await this.ref().update(updates)
     }
 
     async removeUserSessions(userId: string): Promise<void> {
         const sessionIds = await this.getUserSessionIds(userId)
-        const tableRef = this.tablePath(userId)
+        const tableRef = this.ref(this.tablePath(userId))
+        const sessionRef = this.ref(this.sessionPath())
 
-        const sessionRefs = sessionIds.map((id) => this.sessionPath(id))
+        const sessionUpdates: Removable = sessionIds.reduce((removable, id) => {
+            return {
+                ...removable,
+                [id]: null,
+            }
+        }, {})
 
         await Promise.all([
-            ...sessionRefs.map((ref) => ref.remove()),
             tableRef.remove(),
+            sessionRef.update(sessionUpdates),
         ])
     }
 
     async removeExpiredSessions(): Promise<void> {
-        const sessionRef = this.sessionPath()
-        const sessionSnapshot = await sessionRef.once('value')
+        const ref = this.ref(this.tablePath())
+        const snapshot = await ref.once('value')
+        const data: TablePath = snapshot.val()
 
-        const sessions: SessionPath = sessionSnapshot.val()
+        const sessionIds = Object.values(data).map((map) => Object.keys(map))
 
-        const expiredSessions: Reference[] = []
+        const transaction = async (iterable: IterableIterator<string>) => {
+            const tableCleanup: Removable = {}
 
-        for (const [id, session] of Object.entries(sessions)) {
-            if (Date.now() <= session.TTL) continue
+            for (const id of iterable) {
+                const ref = this.ref(this.sessionPath(id))
+                const snapshot = await ref.once('value')
+                const data: Session | null = snapshot.val()
 
-            expiredSessions.push(
-                this.sessionPath(id),
-                this.tablePath(session.userId, id)
-            )
+                if (!data) continue
+
+                const res = await ref.transaction((session: Session) => {
+                    if (Date.now() <= session.TTL) return session
+
+                    return null
+                })
+
+                if (!res.committed)
+                    throw new Error(
+                        `Session Remove - failed to remove ${id} session`
+                    )
+
+                tableCleanup[this.tablePath(data.userId, id)] = null
+            }
+
+            await this.ref().update(tableCleanup)
         }
 
-        await Promise.all(expiredSessions.map((ref) => ref.remove()))
+        const workers = new Array(500)
+            .fill(sessionIds.values())
+            .map(transaction)
+
+        await Promise.allSettled(workers)
     }
 
     private async getUserSessionIds(userId: string) {
-        const tableRef = this.tablePath(userId)
+        const tableRef = this.ref(this.tablePath(userId))
         const tableSnapshot = await tableRef.once('value')
 
         if (!tableSnapshot.exists()) return []
@@ -129,8 +162,12 @@ export class AdminAdaptor implements Adaptor {
         return Object.entries(userSessionIds).map(([id]) => id)
     }
 
+    private ref(path?: string) {
+        return this.driver.ref(path)
+    }
+
     private rootPath(...path: string[]) {
-        return this.driver.ref(this.config.root.concat(path).join('/'))
+        return this.config.root.concat(path).join('/')
     }
 
     private sessionPath(...path: string[]) {
