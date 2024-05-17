@@ -1,0 +1,15 @@
+{
+    "name": "frsh-tests",
+    "version": "1.0.0",
+    "description": "Test adaptors with core Frsh module",
+    "type": "module",
+    "scripts": {
+        "test": "vitest"
+    },
+    "author": "Jackie Li",
+    "devDependencies": {
+        "firebase-admin": "^12.1.0",
+        "typescript": "^5.4.5",
+        "vitest": "^1.6.0"
+    }
+}

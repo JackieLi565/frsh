@@ -1,0 +1,20 @@
+{
+    "compilerOptions": {
+        "strict": true,
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
+        "target": "ES2022",
+        "declaration": true,
+        "skipLibCheck": true,
+        "noImplicitAny": true,
+        "sourceMap": true,
+        "lib": ["ES2022"],
+        "baseUrl": ".",
+        "paths": {
+            "@admin/*": ["./packages/admin/lib/*"],
+            "@core/*": ["./packages/frsh/lib/*"],
+            "@rest/*": ["./packages/rest/lib/*"]
+        }
+    },
+    "exclude": ["node_modules/"]
+}
