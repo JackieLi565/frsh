@@ -1,6 +1,6 @@
 {
     "name": "@frsh-auth/admin-adaptor",
-    "version": "0.0.0",
+    "version": "0.0.1",
     "description": "Frsh adaptor for Firebase admin-SDK",
     "main": "./lib/index.js",
     "types": "./lib/index.d.ts",
@@ -18,10 +18,17 @@
         "firebase-admin": "12.1.0",
         "@frsh-auth/frsh": "0.0.5"
     },
+    "repository": {
+        "url": "https://github.com/JackieLi565/frsh/tree/main/packages/admin",
+        "type": "git"
+    },
     "devDependencies": {
         "@frsh-auth/frsh": "^0.0.5",
         "@types/node": "^20.12.12",
         "firebase-admin": "^12.1.0",
         "typescript": "^5.4.5"
+    },
+    "publishConfig": {
+        "access": "public"
     }
 }
