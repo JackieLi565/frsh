@@ -1,7 +1,7 @@
 import type { PathConfig, Session } from '@frsh-auth/frsh'
 import type { Adaptor, TablePath } from '@frsh-auth/frsh/lib/internal'
-import type { Database } from 'firebase-admin/database'
-import { Removable } from './internal/index.js'
+import type { Removable } from './internal/index.js'
+import type { Database } from '@firebase/database-types'
 
 export class AdminAdaptor implements Adaptor {
     private config: PathConfig

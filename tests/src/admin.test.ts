@@ -1,20 +1,8 @@
-import admin, { database } from 'firebase-admin'
-import serviceAccount from '../credentials.json'
+import { db } from './driver.js'
 import { runTestsForAdaptor } from './driver.js'
 import { AdminAdaptor } from '../../packages/admin/lib/index.js'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { v4 } from 'uuid'
-
-admin.initializeApp({
-    credential: admin.credential.cert({
-        projectId: serviceAccount.project_id,
-        clientEmail: serviceAccount.client_email,
-        privateKey: serviceAccount.private_key,
-    }),
-    databaseURL: serviceAccount.database_url,
-})
-
-const db = database()
 
 describe('Config path', () => {
     const clean = async () => {
@@ -62,4 +50,4 @@ describe('Config path', () => {
     })
 })
 
-runTestsForAdaptor(db, new AdminAdaptor(db), 'Admin')
+runTestsForAdaptor(new AdminAdaptor(db), 'Admin')

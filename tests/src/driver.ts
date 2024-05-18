@@ -1,12 +1,12 @@
 import { describe, expect, beforeEach, test, afterEach } from 'vitest'
 import { Adaptor, TablePath } from '../../packages/frsh/lib/internal/index.js'
 import { Frsh, Session } from '../../packages/frsh/lib/index.js'
-import { database } from 'firebase-admin'
 import type { Database } from 'firebase-admin/database'
 import { v4 } from 'uuid'
+import admin, { database } from 'firebase-admin'
+import serviceAccount from '../credentials.json'
 
 export function runTestsForAdaptor(
-    db: Database,
     adaptorInstance: Adaptor,
     adaptorName: string
 ) {
@@ -134,6 +134,17 @@ export function runTestsForAdaptor(
         })
     })
 }
+
+admin.initializeApp({
+    credential: admin.credential.cert({
+        projectId: serviceAccount.project_id,
+        clientEmail: serviceAccount.client_email,
+        privateKey: serviceAccount.private_key,
+    }),
+    databaseURL: serviceAccount.database_url,
+})
+
+export const db = database()
 
 const user1 = v4(),
     user2 = v4()
