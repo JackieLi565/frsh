@@ -68,6 +68,20 @@ export class Frsh {
             .sort((a, b) => b.TTL - a.TTL)
     }
 
+    async extendSessionExpiry(sessionId: string, expiry: number) {
+        if (expiry < 0) {
+            throw new Error(
+                `Invalid expiry: ${expiry}. The expiry duration must be a non-negative value.`
+            )
+        } else if (expiry === 0) {
+            console.warn(
+                'Warning: The expiry duration is set to zero. This will not extend the session expiry time.'
+            )
+        } else {
+            this.adaptor.updateSessionExpiry(sessionId, expiry)
+        }
+    }
+
     async deleteSession(sessionId: string) {
         await this.adaptor.removeSession(sessionId)
     }
