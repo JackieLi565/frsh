@@ -14,6 +14,10 @@ export class AdminAdaptor implements Adaptor {
             root: ['frsh'],
         }
 
+        if (config?.root) {
+            config.root = config.root.map((path) => path.replace('/', ''))
+        }
+
         this.config = { ...defaultConfig, ...config }
         this.driver = driver
     }
@@ -37,7 +41,6 @@ export class AdminAdaptor implements Adaptor {
     }
 
     async createSession(session: Session): Promise<string> {
-        const tableRef = this.ref(this.tablePath())
         const sessionRef = this.ref(this.sessionPath())
 
         const ref = await sessionRef.push(session)
@@ -47,7 +50,9 @@ export class AdminAdaptor implements Adaptor {
                 `Session Create - ${session.userId} session key response is null`
             )
 
-        await tableRef.update({
+        const tableRef = this.ref(this.tablePath(session.userId))
+
+        await tableRef.push({
             [ref.key]: Date.now(),
         })
 
@@ -61,10 +66,9 @@ export class AdminAdaptor implements Adaptor {
         const ref = this.ref(this.sessionPath(sessionId, 'TTL'))
 
         const res = await ref.transaction((TTL) => {
-            if (TTL === null)
-                throw new Error(
-                    `Session Update - property TTL does not exist within ${sessionId} session`
-                )
+            if (!TTL) {
+                return TTL
+            }
 
             return TTL + extension
         })
@@ -115,40 +119,44 @@ export class AdminAdaptor implements Adaptor {
         const snapshot = await ref.once('value')
         const data: TablePath = snapshot.val()
 
-        const sessionIds = Object.values(data).map((map) => Object.keys(map))
+        const sessionIds = Object.entries(data).flatMap(
+            ([userId, sessionMap]) =>
+                Object.keys(sessionMap).map((sessionId) => [userId, sessionId])
+        )
+        const iterable = sessionIds.values()
 
-        const transaction = async (iterable: IterableIterator<string>) => {
+        const transaction = async (
+            iterable: ReturnType<typeof sessionIds.values>,
+            index: number
+        ) => {
             const tableCleanup: Removable = {}
 
-            for (const id of iterable) {
-                const ref = this.ref(this.sessionPath(id))
-                const snapshot = await ref.once('value')
-                const data: Session | null = snapshot.val()
+            for (const [userId, sessionId] of iterable) {
+                const ref = this.ref(this.sessionPath(sessionId))
 
-                if (!data) continue
+                await ref.transaction((session: Session | null) => {
+                    if (!session) {
+                        return session
+                    }
 
-                const res = await ref.transaction((session: Session) => {
-                    if (Date.now() <= session.TTL) return session
+                    if (Date.now() > session.TTL) {
+                        console.log(index, 'expired', sessionId)
 
-                    return null
+                        tableCleanup[this.tablePath(userId, sessionId)] = null
+                        return null
+                    }
+
+                    console.log(index, 'ok', sessionId)
+                    return session
                 })
-
-                if (!res.committed)
-                    throw new Error(
-                        `Session Remove - failed to remove ${id} session`
-                    )
-
-                tableCleanup[this.tablePath(data.userId, id)] = null
             }
 
             await this.ref().update(tableCleanup)
         }
 
-        const workers = new Array(500)
-            .fill(sessionIds.values())
-            .map(transaction)
-
-        await Promise.allSettled(workers)
+        await Promise.allSettled(
+            new Array<typeof iterable>(4).fill(iterable).map(transaction)
+        )
     }
 
     private async getUserSessionIds(userId: string) {

@@ -6,5 +6,6 @@ export default defineConfig({
         include: ['src/*'],
         globals: true,
         environment: 'node',
+        exclude: ['src/driver.ts'],
     },
 })

@@ -8,13 +8,7 @@
         "skipLibCheck": true,
         "noImplicitAny": true,
         "sourceMap": true,
-        "lib": ["ES2022"],
-        "baseUrl": ".",
-        "paths": {
-            "@admin/*": ["./packages/admin/lib/*"],
-            "@core/*": ["./packages/frsh/lib/*"],
-            "@rest/*": ["./packages/rest/lib/*"]
-        }
+        "lib": ["ES2022"]
     },
     "exclude": ["node_modules/"]
 }
