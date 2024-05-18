@@ -14,7 +14,14 @@
         "Frsh"
     ],
     "author": "Jackie Li",
+    "peerDependencies": {
+        "@frsh-auth/frsh": "0.0.5"
+    },
     "devDependencies": {
+        "@frsh-auth/frsh": "^0.0.5",
         "typescript": "^5.4.5"
+    },
+    "publishConfig": {
+        "access": "public"
     }
 }
