@@ -1,7 +1,7 @@
 {
-    "name": "frsh-repository",
+    "name": "frsh-auth",
     "version": "0.0.0",
-    "description": "Repository for all things frsh related",
+    "description": "Frsh monorepo",
     "type": "module",
     "directories": {
         "doc": "docs",
@@ -13,9 +13,14 @@
     },
     "author": "Jackie Li",
     "license": "MIT",
+    "repository": {
+        "url": "https://github.com/JackieLi565/frsh",
+        "type": "git"
+    },
     "devDependencies": {
         "@eslint/js": "^9.2.0",
         "prettier": "3.2.5",
+        "typescript": "^5.4.5",
         "typescript-eslint": "^7.9.0"
     }
 }

@@ -1,8 +1,5 @@
 src
 node_modules
-
 .env
 .DS_Store
-.gitignore
-eslint.config.js
 tsconfig.json

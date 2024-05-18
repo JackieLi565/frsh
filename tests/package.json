@@ -1,0 +1,17 @@
+{
+    "name": "@frsh-auth/tests",
+    "version": "1.0.0",
+    "description": "Test adaptors with core Frsh module",
+    "type": "module",
+    "scripts": {
+        "test": "vitest"
+    },
+    "author": "Jackie Li",
+    "devDependencies": {
+        "@types/uuid": "^9.0.8",
+        "firebase-admin": "^12.1.0",
+        "typescript": "^5.4.5",
+        "uuid": "^9.0.1",
+        "vitest": "^1.6.0"
+    }
+}

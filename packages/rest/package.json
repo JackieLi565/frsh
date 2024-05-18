@@ -1,7 +1,7 @@
 {
-    "name": "rest-adaptor",
+    "name": "@frsh-auth/rest-adaptor",
     "version": "0.0.0",
-    "description": "Frsh adaptor for REST-api",
+    "description": "Frsh adaptor for Firebase RTDB REST-API",
     "main": "./lib/index.js",
     "types": "./lib/index.d.ts",
     "module": "./lib/index.js",
