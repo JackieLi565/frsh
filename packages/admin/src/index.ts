@@ -98,20 +98,16 @@ export class AdminAdaptor implements Adaptor {
 
     async removeUserSessions(userId: string): Promise<void> {
         const sessionIds = await this.getUserSessionIds(userId)
-        const tableRef = this.ref(this.tablePath(userId))
-        const sessionRef = this.ref(this.sessionPath())
 
-        const sessionUpdates: Removable = sessionIds.reduce((removable, id) => {
+        const removalUpdates: Removable = sessionIds.reduce((removable, id) => {
             return {
                 ...removable,
-                [id]: null,
+                [this.sessionPath(id)]: null,
             }
         }, {})
 
-        await Promise.all([
-            tableRef.remove(),
-            sessionRef.update(sessionUpdates),
-        ])
+        removalUpdates[this.tablePath(userId)] = null
+        await this.ref().update(removalUpdates)
     }
 
     async removeExpiredSessions(): Promise<void> {
@@ -119,6 +115,7 @@ export class AdminAdaptor implements Adaptor {
         const snapshot = await ref.once('value')
         const data: TablePath = snapshot.val()
 
+        // depending on the size of the table this compute could get out of hand
         const sessionIds = Object.entries(data).flatMap(
             ([userId, sessionMap]) =>
                 Object.keys(sessionMap).map((sessionId) => [userId, sessionId])
@@ -126,8 +123,7 @@ export class AdminAdaptor implements Adaptor {
         const iterable = sessionIds.values()
 
         const transaction = async (
-            iterable: ReturnType<typeof sessionIds.values>,
-            index: number
+            iterable: ReturnType<typeof sessionIds.values>
         ) => {
             const tableCleanup: Removable = {}
 
@@ -140,13 +136,10 @@ export class AdminAdaptor implements Adaptor {
                     }
 
                     if (Date.now() > session.TTL) {
-                        console.log(index, 'expired', sessionId)
-
                         tableCleanup[this.tablePath(userId, sessionId)] = null
                         return null
                     }
 
-                    console.log(index, 'ok', sessionId)
                     return session
                 })
             }

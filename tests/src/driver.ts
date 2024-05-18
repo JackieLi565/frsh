@@ -37,30 +37,29 @@ export function runTestsForAdaptor(
             test('defined & non-expired session, should return a valid session', async () => {
                 const session = validSessions[0]
 
-                const expectedSession = await frsh.verifySession(session.id)
+                const resultSession = await frsh.verifySession(session.id)
 
-                expect(expectedSession).not.toBeNull()
+                expect(resultSession).not.toBeNull()
             })
 
             test('defined & expired session, should return a null session', async () => {
                 const session = expiredSessions[0]
 
-                const expectedSession = await frsh.verifySession(session.id)
+                const resultSession = await frsh.verifySession(session.id)
 
-                expect(expectedSession).toBeNull()
+                expect(resultSession).toBeNull()
             })
         })
 
         describe('getUserSessions Method', () => {
             test('should return a list of non-expired sessions from a given user ID', async () => {
-                const userId = validSessions[0].userId
                 const expectListSize = 2
-                const sessions = await frsh.getUserSessions(userId)
+                const sessions = await frsh.getUserSessions(user1)
 
                 expect(sessions.length).toEqual(expectListSize)
 
                 for (const session of sessions) {
-                    expect(session.userId).toEqual(userId)
+                    expect(session.userId).toEqual(user1)
                 }
             })
         })
@@ -70,6 +69,7 @@ export function runTestsForAdaptor(
                 const selectedSession = sessions[0]
                 const sessionId = selectedSession.id
                 const userId = selectedSession.userId
+
                 await frsh.deleteSession(sessionId)
 
                 const sessionSnapshot = await db
@@ -93,11 +93,11 @@ export function runTestsForAdaptor(
                 const tableSnapshot = await db
                     .ref(`frsh/table/${userId}`)
                     .once('value')
-                expect(tableSnapshot.exists()).toBeFalsy()
-
                 const sessionSnapshot = await db
                     .ref(`frsh/sessions`)
                     .once('value')
+
+                expect(tableSnapshot.exists()).toBeFalsy()
 
                 for (const session of Object.values<Session>(
                     sessionSnapshot.val()
@@ -120,18 +120,16 @@ export function runTestsForAdaptor(
                     .ref('frsh/sessions')
                     .once('value')
 
-                const flattenTable = Object.values<{
+                const tableSessionIds = Object.values<{
                     [key: string]: any
                 }>(tableSnapshot.val()).flatMap((userSessions) =>
                     Object.keys(userSessions)
                 )
+                const sessionIds = Object.keys(sessionSnapshot.val())
 
                 for (const expiredSessionId of expiredSessionIds) {
-                    expect(Object.keys(sessionSnapshot.val())).not.toContain(
-                        expiredSessionId
-                    )
-
-                    expect(flattenTable).not.toContain(expiredSessionId)
+                    expect(sessionIds).not.toContain(expiredSessionId)
+                    expect(tableSessionIds).not.toContain(expiredSessionId)
                 }
             })
         })
