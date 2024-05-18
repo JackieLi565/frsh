@@ -1,6 +1,6 @@
 {
     "name": "@frsh-auth/frsh",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "description": "A lightweight session management store for Firebase Realtime DB.",
     "main": "./lib/index.js",
     "types": "./lib/index.d.ts",
