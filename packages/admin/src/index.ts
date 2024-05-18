@@ -110,7 +110,7 @@ export class AdminAdaptor implements Adaptor {
         await this.ref().update(removalUpdates)
     }
 
-    async removeExpiredSessions(): Promise<void> {
+    async removeExpiredSessions(batch: number): Promise<void> {
         const ref = this.ref(this.tablePath())
         const snapshot = await ref.once('value')
         const data: TablePath = snapshot.val()
@@ -147,8 +147,9 @@ export class AdminAdaptor implements Adaptor {
             await this.ref().update(tableCleanup)
         }
 
+        const workers = sessionIds.length < batch ? sessionIds.length : batch
         await Promise.allSettled(
-            new Array<typeof iterable>(4).fill(iterable).map(transaction)
+            new Array<typeof iterable>(workers).fill(iterable).map(transaction)
         )
     }
 

@@ -1,11 +1,12 @@
 import { describe, expect, beforeEach, test, afterEach } from 'vitest'
-import { Adaptor } from '../../packages/frsh/lib/internal/index.js'
+import { Adaptor, TablePath } from '../../packages/frsh/lib/internal/index.js'
 import { Frsh, Session } from '../../packages/frsh/lib/index.js'
-import admin, { database } from 'firebase-admin'
-import serviceAccount from '../credentials.json'
+import { database } from 'firebase-admin'
+import type { Database } from 'firebase-admin/database'
 import { v4 } from 'uuid'
 
 export function runTestsForAdaptor(
+    db: Database,
     adaptorInstance: Adaptor,
     adaptorName: string
 ) {
@@ -17,11 +18,11 @@ export function runTestsForAdaptor(
                 expiry: 15_000,
             })
 
-            await initData()
+            await initData(db)
         })
 
         afterEach(async () => {
-            await database().ref('frsh').remove()
+            await database().ref().remove()
         })
 
         describe('createSession Method', () => {
@@ -120,11 +121,9 @@ export function runTestsForAdaptor(
                     .ref('frsh/sessions')
                     .once('value')
 
-                const tableSessionIds = Object.values<{
-                    [key: string]: any
-                }>(tableSnapshot.val()).flatMap((userSessions) =>
-                    Object.keys(userSessions)
-                )
+                const tableSessionIds = Object.values<TablePath>(
+                    tableSnapshot.val()
+                ).flatMap((userSessions) => Object.keys(userSessions))
                 const sessionIds = Object.keys(sessionSnapshot.val())
 
                 for (const expiredSessionId of expiredSessionIds) {
@@ -135,15 +134,6 @@ export function runTestsForAdaptor(
         })
     })
 }
-
-admin.initializeApp({
-    credential: admin.credential.cert({
-        projectId: serviceAccount.project_id,
-        clientEmail: serviceAccount.client_email,
-        privateKey: serviceAccount.private_key,
-    }),
-    databaseURL: serviceAccount.database_url,
-})
 
 const user1 = v4(),
     user2 = v4()
@@ -161,9 +151,8 @@ const validSessions = [user1, user1, user2, user2].map((user) => ({
 }))
 
 const sessions = [...validSessions, ...expiredSessions]
-const db = database()
 
-const initData = async () => {
+const initData = async (db: Database) => {
     const sessionRef = db.ref('frsh/sessions')
 
     await Promise.all(
