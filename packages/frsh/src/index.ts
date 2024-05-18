@@ -72,12 +72,12 @@ export class Frsh {
         await this.adaptor.removeSession(sessionId)
     }
 
-    async deleteUserSessions(sessionId: string) {
-        await this.adaptor.removeUserSessions(sessionId)
+    async deleteUserSessions(userId: string) {
+        await this.adaptor.removeUserSessions(userId)
     }
 
-    async deleteExpiredSessions() {
-        await this.deleteExpiredSessions()
+    async deleteExpiredSessions(batch: number = 50) {
+        await this.adaptor.removeExpiredSessions(batch)
     }
 
     private isExpired(expiry: number) {

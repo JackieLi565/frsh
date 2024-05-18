@@ -6,7 +6,7 @@ export interface Adaptor {
     createSession(session: Session): Promise<string>
     updateSessionExpiry(sessionId: string, newExpiry: number): Promise<Session>
     removeSession(sessionId: string): Promise<void>
-    removeExpiredSessions(): Promise<void>
+    removeExpiredSessions(batch: number): Promise<void>
     removeUserSessions(userId: string): Promise<void>
 }
 
