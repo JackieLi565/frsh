@@ -1,6 +1,6 @@
 import type { PathConfig, Session } from '@frsh-auth/frsh'
 import type { Adaptor, TablePath } from '@frsh-auth/frsh/lib/internal'
-import type { Removable } from './internal/index.js'
+import type { Updatable } from './internal/index.js'
 import type { Database } from '@firebase/database-types'
 
 export class AdminAdaptor implements Adaptor {
@@ -22,12 +22,22 @@ export class AdminAdaptor implements Adaptor {
         this.driver = driver
     }
 
+    /**
+     * Returns a invalid, valid, or null session given a sessionId
+     * @param {string} sessionId
+     * @returns {Promise<Session | null>}
+     */
     async getSession(sessionId: string): Promise<Session | null> {
         const ref = this.ref(this.sessionPath(sessionId))
         const snapshot = await ref.once('value')
         return snapshot.val()
     }
 
+    /**
+     * Returns an array of invalid or valid sessions
+     * @param {string} userId
+     * @returns {Promise<Session[]>}
+     */
     async getUserSessions(userId: string): Promise<Session[]> {
         const sessionIds = await this.getUserSessionIds(userId)
 
@@ -40,6 +50,12 @@ export class AdminAdaptor implements Adaptor {
             .map((snapshot) => snapshot.val())
     }
 
+    /**
+     * Returns a unique session ID
+     * @throws Will throw an error if database does not return a unique key (rare case)
+     * @param {Session} session
+     * @returns {Promise<string>}
+     */
     async createSession(session: Session): Promise<string> {
         const sessionRef = this.ref(this.sessionPath())
 
@@ -53,34 +69,50 @@ export class AdminAdaptor implements Adaptor {
         const tableRef = this.ref(this.tablePath(session.userId))
 
         await tableRef.push({
-            [ref.key]: Date.now(),
+            [ref.key]: session.TTL,
         })
 
         return ref.key
     }
 
+    /**
+     * Extends the expiry time of a valid session
+     * @throws Will throw if the session does not exist or if the session is invalid
+     * @param {string} sessionId
+     * @param {string} extension
+     * @returns {Promise<void>}
+     */
     async updateSessionExpiry(
         sessionId: string,
         extension: number
-    ): Promise<Session> {
-        const ref = this.ref(this.sessionPath(sessionId, 'TTL'))
+    ): Promise<void> {
+        const session = await this.getSession(sessionId)
 
-        const res = await ref.transaction((TTL) => {
-            if (!TTL) {
-                return TTL
-            }
-
-            return TTL + extension
-        })
-
-        if (!res.committed)
+        if (!session)
             throw new Error(
-                `Session Update - failed to update ${sessionId} session expiry`
+                `Session Update - can not update null session ${sessionId}`
             )
 
-        return res.snapshot.val()
+        if (Date.now() > session.TTL)
+            throw new Error(
+                `Session Update - can not update invalid session ${sessionId}`
+            )
+
+        const sessionTTLPath = this.sessionPath(sessionId, 'TTL')
+        const tableTTLPath = this.tablePath(session.userId, sessionId)
+
+        const updates: Updatable = {
+            [sessionTTLPath]: session.TTL + extension,
+            [tableTTLPath]: session.TTL + extension,
+        }
+
+        await this.ref().update(updates)
     }
 
+    /**
+     * Remove a session given a sessionId
+     * @param {string} sessionId
+     */
     async removeSession(sessionId: string): Promise<void> {
         const session = await this.getSession(sessionId)
         if (!session) return
@@ -88,7 +120,7 @@ export class AdminAdaptor implements Adaptor {
         const sessionRef = this.sessionPath(sessionId)
         const tableRef = this.tablePath(session.userId, sessionId)
 
-        const updates: Removable = {
+        const updates: Updatable = {
             [sessionRef]: null,
             [tableRef]: null,
         }
@@ -96,10 +128,14 @@ export class AdminAdaptor implements Adaptor {
         await this.ref().update(updates)
     }
 
+    /**
+     * Remove all sessions attached to a user given the userId
+     * @param {string} userId
+     */
     async removeUserSessions(userId: string): Promise<void> {
         const sessionIds = await this.getUserSessionIds(userId)
 
-        const removalUpdates: Removable = sessionIds.reduce((removable, id) => {
+        const removalUpdates: Updatable = sessionIds.reduce((removable, id) => {
             return {
                 ...removable,
                 [this.sessionPath(id)]: null,
@@ -110,46 +146,50 @@ export class AdminAdaptor implements Adaptor {
         await this.ref().update(removalUpdates)
     }
 
+    /**
+     * Removes all expired/dead session within the database
+     * @param {number} batch number of concurrent workers
+     */
     async removeExpiredSessions(batch: number): Promise<void> {
         const ref = this.ref(this.tablePath())
         const snapshot = await ref.once('value')
         const data: TablePath = snapshot.val()
 
-        // depending on the size of the table this compute could get out of hand
-        const sessionIds = Object.entries(data).flatMap(
-            ([userId, sessionMap]) =>
-                Object.keys(sessionMap).map((sessionId) => [userId, sessionId])
-        )
-        const iterable = sessionIds.values()
+        const sessionIds: [string, string, number][] = []
 
-        const transaction = async (
+        // depending on the size of the table this compute could get out of hand
+        for (const [userId, sessionMap] of Object.entries(data)) {
+            for (const [sessionId, TTL] of Object.entries(sessionMap)) {
+                sessionIds.push([userId, sessionId, TTL])
+            }
+        }
+
+        const iterable = sessionIds.values()
+        const removeSessions = async (
             iterable: ReturnType<typeof sessionIds.values>
         ) => {
-            const tableCleanup: Removable = {}
+            const updates: Updatable = {}
 
-            for (const [userId, sessionId] of iterable) {
-                const ref = this.ref(this.sessionPath(sessionId))
+            for (const [userId, sessionId, TTL] of iterable) {
+                if (Date.now() <= TTL) {
+                    continue
+                }
 
-                await ref.transaction((session: Session | null) => {
-                    if (!session) {
-                        return session
-                    }
+                const tablePath = this.tablePath(userId, sessionId)
+                const sessionPath = this.sessionPath(sessionId)
 
-                    if (Date.now() > session.TTL) {
-                        tableCleanup[this.tablePath(userId, sessionId)] = null
-                        return null
-                    }
-
-                    return session
-                })
+                updates[tablePath] = null
+                updates[sessionPath] = null
             }
 
-            await this.ref().update(tableCleanup)
+            await this.ref().update(updates)
         }
 
         const workers = sessionIds.length < batch ? sessionIds.length : batch
         await Promise.allSettled(
-            new Array<typeof iterable>(workers).fill(iterable).map(transaction)
+            new Array<typeof iterable>(workers)
+                .fill(iterable)
+                .map(removeSessions)
         )
     }
 
