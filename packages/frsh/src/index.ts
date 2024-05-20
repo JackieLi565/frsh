@@ -85,8 +85,9 @@ export class Frsh {
     }
 
     /**
+     * Extends the expiry time of a given session
      * @param {string} sessionId
-     * @param {number} expiry
+     * @param {number} expiry time in milliseconds
      * @throws {Error} An error will throw if the expiry parameter is less than or equal to zero
      */
     async extendSessionExpiry(sessionId: string, expiry: number) {
@@ -99,7 +100,7 @@ export class Frsh {
     }
 
     /**
-     *
+     * Deletes a given session
      * @param sessionId
      */
     async deleteSession(sessionId: string) {
@@ -107,7 +108,7 @@ export class Frsh {
     }
 
     /**
-     *
+     * Deletes all sessions attached to a given user
      * @param userId
      */
     async deleteUserSessions(userId: string) {
@@ -115,8 +116,9 @@ export class Frsh {
     }
 
     /**
-     *
-     * @param batch
+     * Deletes all expired/invalid sessions within the database
+     * @param batch - Number of workers, default = 50
+     * @throws {Error} An error will throw if the batch size is less than or equal to zero
      */
     async deleteExpiredSessions(batch: number = 50) {
         if (batch <= 0)

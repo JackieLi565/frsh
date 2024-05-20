@@ -6,7 +6,7 @@ export interface Adaptor {
     createSession(session: Session): Promise<string>
     updateSessionExpiry(sessionId: string, newExpiry: number): Promise<void>
     removeSession(sessionId: string): Promise<void>
-    removeExpiredSessions(batch: number): Promise<void>
+    removeExpiredSessions(concurrent: number): Promise<void>
     removeUserSessions(userId: string): Promise<void>
 }
 
@@ -21,6 +21,7 @@ export interface SessionPath {
 
 export interface TablePath {
     [userId: string]: {
+        // value must be equal to the TTL of the reference session
         [sessionId: string]: number
     }
 }
