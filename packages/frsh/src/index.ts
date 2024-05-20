@@ -33,6 +33,12 @@ export class Frsh {
         this.options = { ...defaultOptions, ...options }
     }
 
+    /**
+     * Creates a new session for the given user with specified attributes.
+     * @param {string} userId
+     * @param {SessionAttributes} record
+     * @returns {Promise<[string, Session]>} - A tuple containing the session ID and the session object.
+     */
     async createSession(
         userId: string,
         record: SessionAttributes
@@ -48,6 +54,11 @@ export class Frsh {
         return [key, session]
     }
 
+    /**
+     * Verifies a session given a session ID
+     * @param {string} sessionId
+     * @returns {Promise<Session | null>} - Returns a session if the session is valid, otherwise null
+     */
     async verifySession(sessionId: string): Promise<Session | null> {
         const session = await this.adaptor.getSession(sessionId)
 
@@ -60,6 +71,11 @@ export class Frsh {
         return session
     }
 
+    /**
+     * Retrieves a list of active sessions from a given user
+     * @param {string} userId
+     * @returns - Returns a sorted list of session ordered by newest to oldest
+     */
     async getUserSessions(userId: string) {
         const sessions = await this.adaptor.getUserSessions(userId)
 
@@ -68,29 +84,46 @@ export class Frsh {
             .sort((a, b) => b.TTL - a.TTL)
     }
 
+    /**
+     * @param {string} sessionId
+     * @param {number} expiry
+     * @throws {Error} An error will throw if the expiry parameter is less than or equal to zero
+     */
     async extendSessionExpiry(sessionId: string, expiry: number) {
-        if (expiry < 0) {
+        if (expiry <= 0)
             throw new Error(
-                `Invalid expiry: ${expiry}. The expiry duration must be a non-negative value.`
+                `Invalid expiry: ${expiry}. The expiry duration must be greater than zero.`
             )
-        } else if (expiry === 0) {
-            console.warn(
-                'Warning: The expiry duration is set to zero. This will not extend the session expiry time.'
-            )
-        } else {
-            this.adaptor.updateSessionExpiry(sessionId, expiry)
-        }
+
+        await this.adaptor.updateSessionExpiry(sessionId, expiry)
     }
 
+    /**
+     *
+     * @param sessionId
+     */
     async deleteSession(sessionId: string) {
         await this.adaptor.removeSession(sessionId)
     }
 
+    /**
+     *
+     * @param userId
+     */
     async deleteUserSessions(userId: string) {
         await this.adaptor.removeUserSessions(userId)
     }
 
+    /**
+     *
+     * @param batch
+     */
     async deleteExpiredSessions(batch: number = 50) {
+        if (batch <= 0)
+            throw new Error(
+                `Invalid batch: ${batch}. The batch workers must be greater than zero.`
+            )
+
         await this.adaptor.removeExpiredSessions(batch)
     }
 
