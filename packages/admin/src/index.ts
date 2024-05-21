@@ -1,7 +1,7 @@
 import type { PathConfig, Session } from '@frsh-auth/frsh'
 import type { Adaptor, TablePath } from '@frsh-auth/frsh/lib/internal'
 import type { Updatable } from './internal/index.js'
-import type { Database } from '@firebase/database-types'
+import type { DataSnapshot, Database } from '@firebase/database-types'
 
 export class AdminAdaptor implements Adaptor {
     private config: PathConfig
@@ -23,41 +23,46 @@ export class AdminAdaptor implements Adaptor {
     }
 
     /**
-     * Returns a invalid, valid, or null session given a sessionId
+     * Retrieves session data for a given sessionId
      * @param {string} sessionId
-     * @returns {Promise<Session | null>}
+     * @returns {Promise<Session | null>} - Returns a invalid, valid, or null session given a sessionId
      */
     async getSession(sessionId: string): Promise<Session | null> {
-        const ref = this.ref(this.sessionPath(sessionId))
+        const ref = this._ref(this._sessionPath(sessionId))
         const snapshot = await ref.once('value')
         return snapshot.val()
     }
 
     /**
-     * Returns an array of invalid or valid sessions
+     * Retrieves a list of sessions from a given userId
      * @param {string} userId
-     * @returns {Promise<Session[]>}
+     * @returns {Promise<Session[]>} - Returns an array of invalid or valid sessions
      */
     async getUserSessions(userId: string): Promise<Session[]> {
-        const sessionIds = await this.getUserSessionIds(userId)
+        const sessionIds = await this._getUserSessionIds(userId)
 
-        const sessionSnapshots = await Promise.all(
-            sessionIds.map((id) => this.ref(this.sessionPath(id)).once('value'))
+        const sessionSnapshots = await Promise.allSettled(
+            sessionIds.map((id) =>
+                this._ref(this._sessionPath(id)).once('value')
+            )
         )
 
         return sessionSnapshots
-            .filter((snapshot) => snapshot.exists())
-            .map((snapshot) => snapshot.val())
+            .filter(
+                (result): result is PromiseFulfilledResult<DataSnapshot> =>
+                    result.status === 'fulfilled' && result.value.exists()
+            )
+            .map((result) => result.value.val())
     }
 
     /**
-     * Returns a unique session ID
-     * @throws Will throw an error if database does not return a unique key (rare case)
+     * Creates a new unique session
      * @param {Session} session
-     * @returns {Promise<string>}
+     * @returns {Promise<string>} - Returns a unique session ID
+     * @throws {Error} Will throw an error if database does not return a unique key (rare case)
      */
     async createSession(session: Session): Promise<string> {
-        const sessionRef = this.ref(this.sessionPath())
+        const sessionRef = this._ref(this._sessionPath())
 
         const ref = await sessionRef.push(session)
 
@@ -66,7 +71,7 @@ export class AdminAdaptor implements Adaptor {
                 `Session Create - ${session.userId} session key response is null`
             )
 
-        const tableRef = this.ref(this.tablePath(session.userId))
+        const tableRef = this._ref(this._tablePath(session.userId))
 
         await tableRef.push({
             [ref.key]: session.TTL,
@@ -77,10 +82,10 @@ export class AdminAdaptor implements Adaptor {
 
     /**
      * Extends the expiry time of a valid session
-     * @throws Will throw if the session does not exist or if the session is invalid
      * @param {string} sessionId
      * @param {string} extension
      * @returns {Promise<void>}
+     * @throws {Error} Will throw if the session does not exist or if the session is invalid
      */
     async updateSessionExpiry(
         sessionId: string,
@@ -98,15 +103,15 @@ export class AdminAdaptor implements Adaptor {
                 `Session Update - can not update invalid session ${sessionId}`
             )
 
-        const sessionTTLPath = this.sessionPath(sessionId, 'TTL')
-        const tableTTLPath = this.tablePath(session.userId, sessionId)
+        const sessionTTLPath = this._sessionPath(sessionId, 'TTL')
+        const tableTTLPath = this._tablePath(session.userId, sessionId)
 
         const updates: Updatable = {
             [sessionTTLPath]: session.TTL + extension,
             [tableTTLPath]: session.TTL + extension,
         }
 
-        await this.ref().update(updates)
+        await this._ref().update(updates)
     }
 
     /**
@@ -117,15 +122,15 @@ export class AdminAdaptor implements Adaptor {
         const session = await this.getSession(sessionId)
         if (!session) return
 
-        const sessionRef = this.sessionPath(sessionId)
-        const tableRef = this.tablePath(session.userId, sessionId)
+        const sessionRef = this._sessionPath(sessionId)
+        const tableRef = this._tablePath(session.userId, sessionId)
 
         const updates: Updatable = {
             [sessionRef]: null,
             [tableRef]: null,
         }
 
-        await this.ref().update(updates)
+        await this._ref().update(updates)
     }
 
     /**
@@ -133,25 +138,25 @@ export class AdminAdaptor implements Adaptor {
      * @param {string} userId
      */
     async removeUserSessions(userId: string): Promise<void> {
-        const sessionIds = await this.getUserSessionIds(userId)
+        const sessionIds = await this._getUserSessionIds(userId)
 
         const removalUpdates: Updatable = sessionIds.reduce((removable, id) => {
             return {
                 ...removable,
-                [this.sessionPath(id)]: null,
+                [this._sessionPath(id)]: null,
             }
         }, {})
 
-        removalUpdates[this.tablePath(userId)] = null
-        await this.ref().update(removalUpdates)
+        removalUpdates[this._tablePath(userId)] = null
+        await this._ref().update(removalUpdates)
     }
 
     /**
      * Removes all expired/dead session within the database
-     * @param {number} batch number of concurrent workers
+     * @param {number} concurrent number of concurrent workers
      */
-    async removeExpiredSessions(batch: number): Promise<void> {
-        const ref = this.ref(this.tablePath())
+    async removeExpiredSessions(concurrent: number): Promise<void> {
+        const ref = this._ref(this._tablePath())
         const snapshot = await ref.once('value')
         const data: TablePath = snapshot.val()
 
@@ -175,17 +180,18 @@ export class AdminAdaptor implements Adaptor {
                     continue
                 }
 
-                const tablePath = this.tablePath(userId, sessionId)
-                const sessionPath = this.sessionPath(sessionId)
+                const tablePath = this._tablePath(userId, sessionId)
+                const sessionPath = this._sessionPath(sessionId)
 
                 updates[tablePath] = null
                 updates[sessionPath] = null
             }
 
-            await this.ref().update(updates)
+            await this._ref().update(updates)
         }
 
-        const workers = sessionIds.length < batch ? sessionIds.length : batch
+        const workers =
+            sessionIds.length < concurrent ? sessionIds.length : concurrent
         await Promise.allSettled(
             new Array<typeof iterable>(workers)
                 .fill(iterable)
@@ -193,8 +199,8 @@ export class AdminAdaptor implements Adaptor {
         )
     }
 
-    private async getUserSessionIds(userId: string) {
-        const tableRef = this.ref(this.tablePath(userId))
+    private async _getUserSessionIds(userId: string) {
+        const tableRef = this._ref(this._tablePath(userId))
         const tableSnapshot = await tableRef.once('value')
 
         if (!tableSnapshot.exists()) return []
@@ -204,19 +210,19 @@ export class AdminAdaptor implements Adaptor {
         return Object.entries(userSessionIds).map(([id]) => id)
     }
 
-    private ref(path?: string) {
+    private _ref(path?: string) {
         return this.driver.ref(path)
     }
 
-    private rootPath(...path: string[]) {
+    private _rootPath(...path: string[]) {
         return this.config.root.concat(path).join('/')
     }
 
-    private sessionPath(...path: string[]) {
-        return this.rootPath(this.SESSION_PATH, ...path)
+    private _sessionPath(...path: string[]) {
+        return this._rootPath(this.SESSION_PATH, ...path)
     }
 
-    private tablePath(...path: string[]) {
-        return this.rootPath(this.TABLE_PATH, ...path)
+    private _tablePath(...path: string[]) {
+        return this._rootPath(this.TABLE_PATH, ...path)
     }
 }
