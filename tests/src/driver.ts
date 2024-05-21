@@ -65,6 +65,37 @@ export function runTestsForAdaptor(
             })
         })
 
+        describe('extendSessionExpiry Method', () => {
+            test('should successfully update the TTL attribute', async () => {
+                const selectedSession = sessions[0]
+                const sessionId = selectedSession.id
+                const userId = selectedSession.userId
+
+                const sessionRef = db.ref(`frsh/sessions/${sessionId}/TTL`)
+                const tableRef = db.ref(`frsh/table/${userId}/${sessionId}`)
+
+                const sessionSnapshot = await sessionRef.once('value')
+                const tableSnapshot = await tableRef.once('value')
+                const sessionTTL: number = sessionSnapshot.val()
+                const tableSessionTTL: number = tableSnapshot.val()
+
+                const extendedTime = 60_000
+                const expectedSessionTTL = sessionTTL + extendedTime
+                const expectedTableSessionTTL = tableSessionTTL + extendedTime
+
+                await frsh.extendSessionExpiry(sessionId, extendedTime)
+
+                const updatedSessionSnapshot = await sessionRef.once('value')
+                const updatedTableSnapshot = await tableRef.once('value')
+
+                expect(sessionTTL).toEqual(tableSessionTTL)
+                expect(expectedSessionTTL).toEqual(updatedSessionSnapshot.val())
+                expect(expectedTableSessionTTL).toEqual(
+                    updatedTableSnapshot.val()
+                )
+            })
+        })
+
         describe('deleteSession Method', () => {
             test('should successfully delete a session & ensure that it does not exist', async () => {
                 const selectedSession = sessions[0]
@@ -176,7 +207,7 @@ const initData = async (db: Database) => {
             })
 
             const tableRef = db.ref(`frsh/table/${userId}`)
-            tableRef.update({ [id]: Date.now() })
+            tableRef.update({ [id]: TTL })
         })
     )
 }
